@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(61);
+select plan(71);
 
 -- Schema and RLS assertions. Removing a table or forgetting to enable RLS
 -- makes the corresponding assertion fail independently.
@@ -85,6 +85,22 @@ select results_eq(
   'the global module catalog contains all required module keys'
 );
 
+select results_eq(
+  $$select key from public.permissions order by key$$,
+  $$
+    values
+      ('audit_logs.read'::text),
+      ('financials.view_sensitive'::text),
+      ('modules.manage'::text),
+      ('reports.read'::text),
+      ('settings.manage'::text),
+      ('users.manage'::text),
+      ('vehicles.manage'::text),
+      ('vehicles.read'::text)
+  $$,
+  'the global permission catalog contains exactly the eight stable keys'
+);
+
 -- Deterministic fixtures are installed as the test runner role, which bypasses
 -- RLS only for setup. Assertions below switch to authenticated JWT contexts.
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password, email_confirmed_at, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
@@ -130,6 +146,10 @@ insert into public.role_permissions (organization_id, role_id, permission_id)
 select '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000103', id
 from public.permissions where key = 'vehicles.manage';
 
+insert into public.role_permissions (organization_id, role_id, permission_id)
+select '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000102', id
+from public.permissions where key in ('vehicles.read', 'reports.read');
+
 insert into public.organization_memberships (id, organization_id, user_id, role_id, status, organization_scope, joined_at, inactivated_at) values
   ('10000000-0000-0000-0000-000000000201', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', '10000000-0000-0000-0000-000000000101', 'active', 'organization', now(), null),
   ('10000000-0000-0000-0000-000000000202', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000102', '10000000-0000-0000-0000-000000000102', 'active', 'organization', now(), null),
@@ -163,6 +183,7 @@ values ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-0000000
 insert into public.dashboard_snapshots (organization_id, branch_id, metric_key, period_start, period_end, payload, is_sensitive)
 values
   ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000301', 'inventory.count', '2026-08-01', '2026-08-01', '{"count":1}', false),
+  ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000302', 'inventory.cebu', '2026-08-01', '2026-08-01', '{"count":1}', false),
   ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000301', 'inventory.gross_margin', '2026-08-01', '2026-08-01', '{"amount":250000}', true);
 
 insert into public.audit_logs (id, organization_id, actor_id, action, entity_type, entity_id)
@@ -217,6 +238,11 @@ select results_eq(
   $$values ('A-001'::text)$$,
   'a branch-scoped user cannot read another branch vehicle'
 );
+select results_eq(
+  $$select metric_key from public.dashboard_snapshots where not is_sensitive order by metric_key$$,
+  $$values ('inventory.count'::text)$$,
+  'a branch-scoped reports reader cannot read another branch snapshot'
+);
 
 reset role;
 set local role authenticated;
@@ -233,6 +259,16 @@ select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-0000000
 select is_empty(
   $$select id from public.organization_memberships where status <> 'active'$$,
   'an ordinary active member cannot see non-active organization memberships'
+);
+select results_eq(
+  $$select stock_number from public.vehicles order by stock_number$$,
+  $$values ('A-001'::text), ('A-002'::text)$$,
+  'a Viewer with vehicles.read can read ordinary organization inventory'
+);
+select results_eq(
+  $$select metric_key from public.dashboard_snapshots where not is_sensitive order by metric_key$$,
+  $$values ('inventory.cebu'::text), ('inventory.count'::text)$$,
+  'a Viewer with reports.read can read non-sensitive organization reports'
 );
 select is_empty(
   $$update public.vehicles set list_price = 1 where id = '10000000-0000-0000-0000-000000000401' returning id$$,
@@ -257,6 +293,36 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000103","role":"authenticated"}', true);
 select is_empty(
+  $$select id from public.vehicles$$,
+  'vehicles.manage alone does not grant inventory reads'
+);
+select is_empty(
+  $$update public.vehicles set list_price = 810000 where id = '10000000-0000-0000-0000-000000000401' returning id$$,
+  'vehicles.manage alone cannot update rows hidden by the vehicles.read policy'
+);
+select is_empty(
+  $$select id from public.dashboard_snapshots where not is_sensitive$$,
+  'an active member without reports.read cannot read non-sensitive reports'
+);
+
+reset role;
+insert into public.role_permissions (organization_id, role_id, permission_id)
+select '10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000103', id
+from public.permissions where key in ('vehicles.read', 'reports.read');
+
+set local role authenticated;
+select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000103","role":"authenticated"}', true);
+select results_eq(
+  $$update public.vehicles set list_price = 810000 where id = '10000000-0000-0000-0000-000000000401' returning stock_number$$,
+  $$values ('A-001'::text)$$,
+  'vehicles.manage plus vehicles.read can update an accessible vehicle'
+);
+select results_eq(
+  $$select metric_key from public.dashboard_snapshots where not is_sensitive order by metric_key$$,
+  $$values ('inventory.cebu'::text), ('inventory.count'::text)$$,
+  'reports.read grants non-sensitive organization reports'
+);
+select is_empty(
   $$select id from public.vehicle_financials$$,
   'a Sales Agent cannot read vehicle financials'
 );
@@ -272,6 +338,11 @@ select results_eq(
   $$select count(*) from public.organization_memberships where status <> 'active'$$,
   $$values (3::bigint)$$,
   'a users.manage actor can see invited, suspended, and inactive memberships'
+);
+select results_eq(
+  $$select metric_key from public.dashboard_snapshots where is_sensitive order by metric_key$$,
+  $$values ('inventory.gross_margin'::text)$$,
+  'reports.read plus financials.view_sensitive grants sensitive reports'
 );
 select results_eq(
   $$update public.organization_memberships set status = 'active', joined_at = now(), inactivated_at = null where id = '10000000-0000-0000-0000-000000000206' returning status::text$$,

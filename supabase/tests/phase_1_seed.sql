@@ -223,14 +223,24 @@ select results_eq(
   $$,
   $$
     values
+      ('branch_manager'::text, 'reports.read'::text),
       ('branch_manager'::text, 'vehicles.manage'::text),
+      ('branch_manager'::text, 'vehicles.read'::text),
+      ('inventory_staff'::text, 'reports.read'::text),
       ('inventory_staff'::text, 'vehicles.manage'::text),
+      ('inventory_staff'::text, 'vehicles.read'::text),
       ('owner'::text, 'audit_logs.read'::text),
       ('owner'::text, 'financials.view_sensitive'::text),
       ('owner'::text, 'modules.manage'::text),
+      ('owner'::text, 'reports.read'::text),
       ('owner'::text, 'settings.manage'::text),
       ('owner'::text, 'users.manage'::text),
-      ('owner'::text, 'vehicles.manage'::text)
+      ('owner'::text, 'vehicles.manage'::text),
+      ('owner'::text, 'vehicles.read'::text),
+      ('sales_agent'::text, 'reports.read'::text),
+      ('sales_agent'::text, 'vehicles.read'::text),
+      ('viewer'::text, 'reports.read'::text),
+      ('viewer'::text, 'vehicles.read'::text)
   $$,
   'system role permissions exactly match the documented least-privilege matrix'
 );
@@ -434,7 +444,7 @@ select results_eq(
       (select count(*)::integer from public.vehicle_financials financial join public.organizations organization on organization.id = financial.organization_id where organization.slug = 'apex-autohaus'),
       (select count(*)::integer from public.dashboard_snapshots snapshot join public.organizations organization on organization.id = snapshot.organization_id where organization.slug = 'apex-autohaus')
   $$,
-  $$values (1, 1, 5, 3, 8, 25, 15, 6)$$,
+  $$values (1, 1, 5, 3, 18, 25, 15, 6)$$,
   'every SQL-owned row set has its deterministic exact cardinality after reset'
 );
 

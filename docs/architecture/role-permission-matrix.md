@@ -3,7 +3,7 @@
 ## Apex Autohaus demo roles
 
 Phase 1 installs five system roles for the fictional `Apex Autohaus` tenant.
-The matrix maps only the six stable permission keys created by the reviewed
+The matrix maps the eight stable permission keys created by the reviewed
 Task 5 migration. Branch and tenant read access is still enforced by active
 membership, organization scope, branch assignment, and RLS; an empty cell does
 not bypass those checks.
@@ -13,11 +13,13 @@ not bypass those checks.
 | `settings.manage` | Yes |  |  |  |  |
 | `modules.manage` | Yes |  |  |  |  |
 | `users.manage` | Yes |  |  |  |  |
+| `vehicles.read` | Yes | Yes | Yes | Yes | Yes |
 | `vehicles.manage` | Yes | Yes |  | Yes |  |
+| `reports.read` | Yes | Yes | Yes | Yes | Yes |
 | `financials.view_sensitive` | Yes |  |  |  |  |
 | `audit_logs.read` | Yes |  |  |  |  |
 
-This produces exactly eight `role_permissions` rows. The seed treats these
+This produces exactly 18 `role_permissions` rows. The seed treats these
 system-role grants as authoritative and removes stale grants for the five
 system roles before finishing a repeat run.
 
@@ -31,20 +33,24 @@ system roles before finishing a repeat run.
 | Inventory Staff | Assigned branches (`QC-MAIN`) | Reads and maintains vehicle records in assigned branches without sensitive financial access. |
 | Viewer | Assigned branches (`QC-MAIN`) | Read-only access to non-sensitive inventory and dashboard data in assigned branches. |
 
-The Task 5 schema deliberately allows active, branch-authorized members to
-read ordinary vehicles and non-sensitive dashboard snapshots without a
-`vehicles.read` or `reports.read` mapping. Those keys do not exist in the
-reviewed catalog and are therefore not invented by this seed.
+The Task 5 schema requires `vehicles.read` for ordinary vehicle SELECT and
+`reports.read` for dashboard snapshot SELECT in addition to active membership
+and organization/branch scope. All five Phase 1 roles receive both read keys
+because each documented behavior includes ordinary inventory and dashboard
+visibility. PostgreSQL also requires SELECT visibility for UPDATE, so every
+role with `vehicles.manage` receives `vehicles.read`; the manage key does not
+silently imply the read key.
 
 `settings.manage` can update organization settings, `users.manage` can
 administer organization memberships, and `modules.manage` changes tenant
 entitlements. They remain Owner-only because the Phase 1 catalog does not yet
 contain branch-limited variants. Similarly, the current vehicle-financial RLS
 policies require `financials.view_sensitive` for every operation, despite the
-key's read-oriented name. Keeping it Owner-only prevents Sales Agent,
-Inventory Staff, Branch Manager, and Viewer access to acquisition value,
-invested value, expected profit, receivables, and the sensitive financial
-dashboard payload.
+key's read-oriented name. Sensitive dashboard rows require both `reports.read`
+and `financials.view_sensitive`. Keeping the sensitive key Owner-only prevents
+Sales Agent, Inventory Staff, Branch Manager, and Viewer access to acquisition
+value, invested value, expected profit, receivables, and the sensitive
+financial dashboard payload.
 
 ## Module entitlement
 

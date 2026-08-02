@@ -26,6 +26,12 @@ relation, fixes `search_path` to the empty string, denies execution to `PUBLIC`
 and `anon`, and grants execution only to `authenticated`. No authorization data
 comes from user-editable JWT metadata.
 
+The stable Phase 1 permission catalog contains exactly eight keys:
+`settings.manage`, `modules.manage`, `users.manage`, `vehicles.read`,
+`vehicles.manage`, `reports.read`, `financials.view_sensitive`, and
+`audit_logs.read`. Permission checks augment rather than replace active
+membership, tenant, and branch predicates.
+
 There are no Phase 1 database views. Any future view exposed through the Data
 API must use `security_invoker = true`; otherwise it must remain in an
 unexposed schema with API roles revoked.
@@ -57,9 +63,9 @@ All primary keys are UUIDs. Mutable entities include `created_at` and
 | `organization_memberships` | Joins an auth profile to one role with status, organization/branch scope, and lifecycle timestamps. One membership per organization/user. | `organization_id` tenant key; composite role foreign key; `(organization_id, id)` and `(organization_id, user_id)` are parent keys for tenant-safe children. | Ordinary active members see active memberships only. Active same-organization actors with `users.manage` can also see and administer invited, suspended, and inactive rows. Inactive/suspended memberships cannot authorize access. |
 | `branches` | Organization branch code/name/address, primary marker, and active state. Only one primary branch per organization. | `organization_id` tenant key; `(organization_id, id)` supports composite child keys. | Reads respect organization scope or explicit assignments. `settings.manage` is required for writes; only organization-scope settings managers can create new branches. |
 | `membership_branches` | Explicit branch assignments for branch-scoped memberships. Unique organization/membership/branch tuple. | `organization_id` tenant key; composite membership and branch foreign keys enforce one tenant on both sides. | A member can see their assignments; `users.manage` can see/manage assignments for the organization. |
-| `vehicles` | General inventory: branch, tenant-unique stock number, plausible model year, make/model/variant, workflow status, list price, and acquisition/listing/release timestamps. | `organization_id` tenant key; composite branch foreign key; `(organization_id, id)` supports financial child integrity. | Active members can read only accessible branches. Writes additionally require `vehicles.manage`. |
-| `vehicle_financials` | One-to-one sensitive financial record with nonnegative acquisition value, total invested value, expected profit, and receivables. | `organization_id` tenant key; unique `vehicle_id`; composite vehicle foreign key enforces same-tenant ownership. | Every operation requires `financials.view_sensitive` plus access to the vehicle's branch. |
-| `dashboard_snapshots` | Precomputed metric payload by period, optional branch, sensitivity marker, and generation time. | `organization_id` tenant key; optional composite branch foreign key. A null branch means an organization-wide aggregate. | Non-sensitive rows require organization and branch scope. Organization-wide rows require organization scope. Sensitive rows additionally require `financials.view_sensitive`. Phase 1 exposes reads only. |
+| `vehicles` | General inventory: branch, tenant-unique stock number, plausible model year, make/model/variant, workflow status, list price, and acquisition/listing/release timestamps. | `organization_id` tenant key; composite branch foreign key; `(organization_id, id)` supports financial child integrity. | Reads require `vehicles.read`, active membership, and branch access. Writes require `vehicles.manage` and branch access; UPDATE also requires `vehicles.read` because PostgreSQL applies the SELECT policy. |
+| `vehicle_financials` | One-to-one sensitive financial record with nonnegative acquisition value, total invested value, expected profit, and receivables. | `organization_id` tenant key; unique `vehicle_id`; composite vehicle foreign key enforces same-tenant ownership. | Every operation requires `financials.view_sensitive` and access to a vehicle visible through the `vehicles.read` branch boundary. |
+| `dashboard_snapshots` | Precomputed metric payload by period, optional branch, sensitivity marker, and generation time. | `organization_id` tenant key; optional composite branch foreign key. A null branch means an organization-wide aggregate. | Every row requires `reports.read`, active membership, and organization/branch scope. Organization-wide rows require organization scope. Sensitive rows additionally require `financials.view_sensitive`. Phase 1 exposes reads only. |
 | `notifications` | Recipient, category, priority, title/body, read state, optional related entity, and creation time. | `organization_id` tenant key; composite recipient foreign key guarantees the recipient belongs to that tenant. | Only a recipient with an active membership in that notification's organization can read or update; column grants restrict updates to `is_read`/`read_at`. Any active member may insert only for an active recipient in the same organization. |
 | `audit_logs` | Append-only action record with actor, entity, before/after JSON, reason, request metadata, and event time. | `organization_id` tenant key; composite actor foreign key prevents cross-tenant actors and preserves the organization when a removed actor is nulled. | Reads require `audit_logs.read`. Inserts require active membership and `actor_id = auth.uid()`. Authenticated users have no update/delete grant or policy. |
 
@@ -70,7 +76,8 @@ profit, receivable, or margin fields. Those values live only in
 `vehicle_financials`, which has its own table grants and RLS permission check.
 This separation ensures a query authorized for ordinary inventory never
 returns sensitive columns at all. Sensitive dashboard payloads use the same
-`financials.view_sensitive` permission.
+`reports.read` scope boundary and additionally require
+`financials.view_sensitive`.
 
 The schema contains no service-role secret, database password, or application
 secret. Service-role access remains a server-only operational concern outside

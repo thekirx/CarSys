@@ -344,7 +344,9 @@ values
   ('e0000000-0000-0000-0000-000000000003', 'users.manage', 'Manage users', 'Manage roles, memberships, permissions, and branch assignments.'),
   ('e0000000-0000-0000-0000-000000000004', 'vehicles.manage', 'Manage vehicles', 'Create and maintain vehicle inventory.'),
   ('e0000000-0000-0000-0000-000000000005', 'financials.view_sensitive', 'View sensitive financials', 'Read vehicle financials and sensitive dashboard metrics.'),
-  ('e0000000-0000-0000-0000-000000000006', 'audit_logs.read', 'Read audit logs', 'Read organization audit history.')
+  ('e0000000-0000-0000-0000-000000000006', 'audit_logs.read', 'Read audit logs', 'Read organization audit history.'),
+  ('e0000000-0000-0000-0000-000000000007', 'vehicles.read', 'View vehicles', 'Read ordinary vehicle inventory within authorized branches.'),
+  ('e0000000-0000-0000-0000-000000000008', 'reports.read', 'View reports', 'Read non-sensitive dashboard reports within authorized scope.')
 on conflict (key) do update
 set name = excluded.name,
     description = excluded.description,
@@ -696,6 +698,7 @@ create policy vehicles_select_scoped_members
 on public.vehicles for select to authenticated
 using (
   private.is_active_member(organization_id)
+  and private.has_permission(organization_id, 'vehicles.read')
   and private.can_access_branch(organization_id, branch_id)
 );
 
@@ -790,6 +793,7 @@ create policy dashboard_snapshots_select_scoped_members
 on public.dashboard_snapshots for select to authenticated
 using (
   private.is_active_member(organization_id)
+  and private.has_permission(organization_id, 'reports.read')
   and (
     (branch_id is not null and private.can_access_branch(organization_id, branch_id))
     or (

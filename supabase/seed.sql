@@ -145,11 +145,11 @@ select
 from public.organizations organization
 cross join (
   values
-    ('a1000000-0000-4000-8000-000000000001'::uuid, 'owner'::text, 'Owner'::text, 'Organization-wide administration, financials, modules, users, and audit visibility.'::text),
-    ('a1000000-0000-4000-8000-000000000002'::uuid, 'branch_manager'::text, 'Branch Manager'::text, 'Assigned-branch operations without organization administration or sensitive financials.'::text),
-    ('a1000000-0000-4000-8000-000000000003'::uuid, 'sales_agent'::text, 'Sales Agent'::text, 'Assigned-branch inventory visibility without sensitive financials or administrative mutation.'::text),
-    ('a1000000-0000-4000-8000-000000000004'::uuid, 'inventory_staff'::text, 'Inventory Staff'::text, 'Assigned-branch vehicle preparation and inventory record maintenance.'::text),
-    ('a1000000-0000-4000-8000-000000000005'::uuid, 'viewer'::text, 'Viewer'::text, 'Read-only assigned-branch visibility without sensitive financials.'::text)
+    ('a1000000-0000-4000-8000-000000000001'::uuid, 'owner'::text, 'Owner'::text, 'Organization-wide administration, inventory, reporting, sensitive financials, modules, users, and audit visibility.'::text),
+    ('a1000000-0000-4000-8000-000000000002'::uuid, 'branch_manager'::text, 'Branch Manager'::text, 'Assigned-branch inventory management and reporting without organization administration or sensitive financials.'::text),
+    ('a1000000-0000-4000-8000-000000000003'::uuid, 'sales_agent'::text, 'Sales Agent'::text, 'Assigned-branch inventory and reporting visibility without sensitive financials or administrative mutation.'::text),
+    ('a1000000-0000-4000-8000-000000000004'::uuid, 'inventory_staff'::text, 'Inventory Staff'::text, 'Assigned-branch vehicle preparation, inventory maintenance, and reporting visibility.'::text),
+    ('a1000000-0000-4000-8000-000000000005'::uuid, 'viewer'::text, 'Viewer'::text, 'Read-only assigned-branch inventory and reporting visibility without sensitive financials.'::text)
 ) as role_seed(id, code, name, description)
 where organization.slug = 'apex-autohaus'
 on conflict (organization_id, code) do update
@@ -182,7 +182,17 @@ cross join (
     ('a3000000-0000-4000-8000-000000000005'::uuid, 'owner'::text, 'financials.view_sensitive'::text),
     ('a3000000-0000-4000-8000-000000000006'::uuid, 'owner'::text, 'audit_logs.read'::text),
     ('a3000000-0000-4000-8000-000000000007'::uuid, 'branch_manager'::text, 'vehicles.manage'::text),
-    ('a3000000-0000-4000-8000-000000000008'::uuid, 'inventory_staff'::text, 'vehicles.manage'::text)
+    ('a3000000-0000-4000-8000-000000000008'::uuid, 'inventory_staff'::text, 'vehicles.manage'::text),
+    ('a3000000-0000-4000-8000-000000000009'::uuid, 'owner'::text, 'vehicles.read'::text),
+    ('a3000000-0000-4000-8000-000000000010'::uuid, 'owner'::text, 'reports.read'::text),
+    ('a3000000-0000-4000-8000-000000000011'::uuid, 'branch_manager'::text, 'vehicles.read'::text),
+    ('a3000000-0000-4000-8000-000000000012'::uuid, 'branch_manager'::text, 'reports.read'::text),
+    ('a3000000-0000-4000-8000-000000000013'::uuid, 'sales_agent'::text, 'vehicles.read'::text),
+    ('a3000000-0000-4000-8000-000000000014'::uuid, 'sales_agent'::text, 'reports.read'::text),
+    ('a3000000-0000-4000-8000-000000000015'::uuid, 'inventory_staff'::text, 'vehicles.read'::text),
+    ('a3000000-0000-4000-8000-000000000016'::uuid, 'inventory_staff'::text, 'reports.read'::text),
+    ('a3000000-0000-4000-8000-000000000017'::uuid, 'viewer'::text, 'vehicles.read'::text),
+    ('a3000000-0000-4000-8000-000000000018'::uuid, 'viewer'::text, 'reports.read'::text)
 ) as permission_seed(id, role_code, permission_key)
 join public.permissions permission on permission.key = permission_seed.permission_key
 where organization.slug = 'apex-autohaus'
@@ -210,8 +220,18 @@ where role_permission.organization_id = organization.id
         ('owner'::text, 'vehicles.manage'::text),
         ('owner'::text, 'financials.view_sensitive'::text),
         ('owner'::text, 'audit_logs.read'::text),
+        ('owner'::text, 'vehicles.read'::text),
+        ('owner'::text, 'reports.read'::text),
         ('branch_manager'::text, 'vehicles.manage'::text),
-        ('inventory_staff'::text, 'vehicles.manage'::text)
+        ('branch_manager'::text, 'vehicles.read'::text),
+        ('branch_manager'::text, 'reports.read'::text),
+        ('sales_agent'::text, 'vehicles.read'::text),
+        ('sales_agent'::text, 'reports.read'::text),
+        ('inventory_staff'::text, 'vehicles.manage'::text),
+        ('inventory_staff'::text, 'vehicles.read'::text),
+        ('inventory_staff'::text, 'reports.read'::text),
+        ('viewer'::text, 'vehicles.read'::text),
+        ('viewer'::text, 'reports.read'::text)
     ) as allowed(role_code, permission_key)
     where allowed.role_code = role.code
       and allowed.permission_key = permission.key
@@ -444,7 +464,7 @@ cross join (
     ('aa000000-0000-4000-8000-000000000001'::uuid, 'seed.organization_configured'::text, 'organization'::text, '{"slug":"apex-autohaus","currency":"PHP","timezone":"Asia/Manila"}'::jsonb, '2026-08-02 09:10:00+08'::timestamptz),
     ('aa000000-0000-4000-8000-000000000002'::uuid, 'seed.branch_configured'::text, 'branch'::text, '{"code":"QC-MAIN","name":"Quezon City Main","is_primary":true}'::jsonb, '2026-08-02 09:11:00+08'::timestamptz),
     ('aa000000-0000-4000-8000-000000000003'::uuid, 'seed.modules_configured'::text, 'organization'::text, '{"dealership":true,"fleet_management":false,"vehicle_rental":false}'::jsonb, '2026-08-02 09:12:00+08'::timestamptz),
-    ('aa000000-0000-4000-8000-000000000004'::uuid, 'seed.roles_configured'::text, 'organization'::text, '{"system_roles":5,"permission_assignments":8}'::jsonb, '2026-08-02 09:13:00+08'::timestamptz),
+    ('aa000000-0000-4000-8000-000000000004'::uuid, 'seed.roles_configured'::text, 'organization'::text, '{"system_roles":5,"permission_assignments":18}'::jsonb, '2026-08-02 09:13:00+08'::timestamptz),
     ('aa000000-0000-4000-8000-000000000005'::uuid, 'seed.inventory_installed'::text, 'branch'::text, '{"vehicles":25,"financial_records":15,"dashboard_snapshots":6}'::jsonb, '2026-08-02 09:14:00+08'::timestamptz)
 ) as audit_seed(id, action, entity_type, after_data, created_at)
 where organization.slug = 'apex-autohaus'
