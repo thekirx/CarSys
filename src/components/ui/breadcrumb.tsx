@@ -86,7 +86,7 @@ function BreadcrumbSeparator({
       {...props}
     >
       {children ?? (
-        <ChevronRightIcon />
+        <ChevronRightIcon data-icon="inline-start" />
       )}
     </li>
   )
@@ -107,8 +107,7 @@ function BreadcrumbEllipsis({
       )}
       {...props}
     >
-      <MoreHorizontalIcon
-      />
+      <MoreHorizontalIcon data-icon="inline-start" />
       <span className="sr-only">More</span>
     </span>
   )

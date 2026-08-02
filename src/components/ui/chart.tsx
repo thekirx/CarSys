@@ -16,7 +16,7 @@ export type ChartConfig = Record<
   string,
   {
     label?: React.ReactNode
-    icon?: React.ComponentType
+    icon?: React.ComponentType<React.ComponentProps<"svg">>
   } & (
     | { color?: string; theme?: never }
     | { color?: never; theme: Record<keyof typeof THEMES, string> }
@@ -217,7 +217,7 @@ function ChartTooltipContent({
                 ) : (
                   <>
                     {itemConfig?.icon ? (
-                      <itemConfig.icon />
+                      <itemConfig.icon data-icon="inline-start" />
                     ) : (
                       !hideIndicator && (
                         <div
@@ -310,7 +310,7 @@ function ChartLegendContent({
               )}
             >
               {itemConfig?.icon && !hideIcon ? (
-                <itemConfig.icon />
+                <itemConfig.icon data-icon="inline-start" />
               ) : (
                 <div
                   className="h-2 w-2 shrink-0 rounded-[2px]"
