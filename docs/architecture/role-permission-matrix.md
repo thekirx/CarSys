@@ -73,13 +73,23 @@ process only:
 - `SUPABASE_URL`
 - `SUPABASE_SERVICE_ROLE_KEY`
 - `DEMO_USER_PASSWORD`
+- `DEMO_IDENTITY_MARKER_SECRET` (a stable server-only value of at least 32 bytes)
 
-The password supplies only newly created Auth users. A repeat run deliberately
-finds an existing email, confirms and reconciles that identity, and preserves
-its current password instead of silently rotating credentials. The script then
-upserts the matching profile, active membership, exact QC-MAIN assignment, and
-dashboard notification. It prints the email and `created`/`reconciled` status,
-never the password, service key, or connection URL.
+The password supplies only newly created Auth users. Creation also writes a
+versioned HMAC-SHA-256 marker to service-controlled `app_metadata`. The signed
+payload binds the Apex organization, stable demo identity key, normalized
+email, and exact role code. A repeat run reconciles an existing email only when
+all marker fields and the constant-time signature check match that expected
+identity. It never treats user-editable `user_metadata` as proof of ownership.
+
+An unmarked email or a marker for another demo email, identity key, or role is
+a hard collision: the script stops before confirming the account or writing a
+profile, membership, assignment, or notification. A valid marked identity
+keeps its current password instead of silently rotating credentials. Keep the
+marker secret stable between runs; rotation requires a separate controlled
+re-signing or identity-recreation procedure. The script prints the email and
+`created`/`reconciled` status, never a password, marker, service key, marker
+secret, or connection URL.
 
 The wholly fictional demo emails are:
 
@@ -91,3 +101,13 @@ The wholly fictional demo emails are:
 
 The service-role key must never be placed in a `NEXT_PUBLIC_` variable or
 imported by application code under `src/`.
+
+## Seed idempotency test invocation
+
+`supabase/tests/phase_1_seed.sql` is psql/pg_prove input. It uses the psql
+`\ir ../seed.sql` meta-command to execute the real seed a second time inside
+the test transaction. Run it from the checked-out standard repository layout,
+for example with `supabase test db supabase/tests/phase_1_seed.sql` after a
+local reset, or with `psql -f supabase/tests/phase_1_seed.sql`. The test runner
+must expose `supabase/seed.sql` at that relative sibling path; copying the test
+file alone into a SQL editor does not satisfy the invocation contract.

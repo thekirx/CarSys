@@ -1,18 +1,26 @@
+import { createHmac, timingSafeEqual } from "node:crypto";
+import { pathToFileURL } from "node:url";
 import { createClient } from "@supabase/supabase-js";
 
 const REQUIRED_ENVIRONMENT = [
   "SUPABASE_URL",
   "SUPABASE_SERVICE_ROLE_KEY",
   "DEMO_USER_PASSWORD",
+  "DEMO_IDENTITY_MARKER_SECRET",
 ];
 
 const ORGANIZATION_SLUG = "apex-autohaus";
 const BRANCH_CODE = "QC-MAIN";
 const SEED_TIMESTAMP = "2026-08-02T01:00:00.000Z";
 const USER_PAGE_SIZE = 200;
+const DEMO_IDENTITY_METADATA_KEY = "carsys_demo_identity";
+const DEMO_IDENTITY_MARKER_VERSION = 1;
+const DEMO_IDENTITY_MARKER_ISSUER = "carsys-demo-bootstrap";
+const MINIMUM_MARKER_SECRET_BYTES = 32;
 
 const demoUsers = [
   {
+    identityKey: "apex-owner",
     email: "owner@apex-autohaus.example",
     displayName: "Mara Santos",
     roleCode: "owner",
@@ -21,6 +29,7 @@ const demoUsers = [
     assignmentId: null,
   },
   {
+    identityKey: "apex-branch-manager",
     email: "branch.manager@apex-autohaus.example",
     displayName: "Rafael Dela Cruz",
     roleCode: "branch_manager",
@@ -29,6 +38,7 @@ const demoUsers = [
     assignmentId: "a8000000-0000-4000-8000-000000000002",
   },
   {
+    identityKey: "apex-sales-agent",
     email: "sales.agent@apex-autohaus.example",
     displayName: "Bianca Reyes",
     roleCode: "sales_agent",
@@ -37,6 +47,7 @@ const demoUsers = [
     assignmentId: "a8000000-0000-4000-8000-000000000003",
   },
   {
+    identityKey: "apex-inventory-staff",
     email: "inventory.staff@apex-autohaus.example",
     displayName: "Noel Bautista",
     roleCode: "inventory_staff",
@@ -45,6 +56,7 @@ const demoUsers = [
     assignmentId: "a8000000-0000-4000-8000-000000000004",
   },
   {
+    identityKey: "apex-viewer",
     email: "viewer@apex-autohaus.example",
     displayName: "Ana Lim",
     roleCode: "viewer",
@@ -61,7 +73,7 @@ const notificationSeeds = [
     category: "financial",
     priority: "high",
     title: "Receivables require review",
-    body: "Two sold or released demo units have outstanding receivables.",
+    body: "Three sold or released demo units have outstanding receivables.",
     stockNumber: "QC-2026-021",
     createdAt: "2026-08-02T01:05:00.000Z",
   },
@@ -107,6 +119,72 @@ const notificationSeeds = [
   },
 ];
 
+function validateMarkerSecret(markerSecret) {
+  if (
+    typeof markerSecret !== "string" ||
+    Buffer.byteLength(markerSecret, "utf8") < MINIMUM_MARKER_SECRET_BYTES
+  ) {
+    throw new Error(
+      `DEMO_IDENTITY_MARKER_SECRET must contain at least ${MINIMUM_MARKER_SECRET_BYTES} bytes`,
+    );
+  }
+}
+
+function markerPayload(demoUser) {
+  return JSON.stringify([
+    DEMO_IDENTITY_MARKER_VERSION,
+    DEMO_IDENTITY_MARKER_ISSUER,
+    ORGANIZATION_SLUG,
+    demoUser.identityKey,
+    demoUser.email.toLowerCase(),
+    demoUser.roleCode,
+  ]);
+}
+
+export function createDemoIdentityMarker(demoUser, markerSecret) {
+  validateMarkerSecret(markerSecret);
+
+  return {
+    version: DEMO_IDENTITY_MARKER_VERSION,
+    issuer: DEMO_IDENTITY_MARKER_ISSUER,
+    organization_slug: ORGANIZATION_SLUG,
+    identity_key: demoUser.identityKey,
+    email: demoUser.email.toLowerCase(),
+    role_code: demoUser.roleCode,
+    signature: createHmac("sha256", markerSecret)
+      .update(markerPayload(demoUser), "utf8")
+      .digest("base64url"),
+  };
+}
+
+function signaturesMatch(actualSignature, expectedSignature) {
+  if (typeof actualSignature !== "string") {
+    return false;
+  }
+
+  const actual = Buffer.from(actualSignature, "utf8");
+  const expected = Buffer.from(expectedSignature, "utf8");
+  return actual.length === expected.length && timingSafeEqual(actual, expected);
+}
+
+export function isExpectedDemoIdentity(authUser, demoUser, markerSecret) {
+  const marker = authUser?.app_metadata?.[DEMO_IDENTITY_METADATA_KEY];
+  if (!marker || typeof marker !== "object" || Array.isArray(marker)) {
+    return false;
+  }
+
+  const expected = createDemoIdentityMarker(demoUser, markerSecret);
+  return (
+    marker.version === expected.version &&
+    marker.issuer === expected.issuer &&
+    marker.organization_slug === expected.organization_slug &&
+    marker.identity_key === expected.identity_key &&
+    marker.email === expected.email &&
+    marker.role_code === expected.role_code &&
+    signaturesMatch(marker.signature, expected.signature)
+  );
+}
+
 function requireEnvironment() {
   const missing = REQUIRED_ENVIRONMENT.filter((name) => !process.env[name]);
 
@@ -118,6 +196,7 @@ function requireEnvironment() {
     supabaseUrl: process.env.SUPABASE_URL,
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     demoPassword: process.env.DEMO_USER_PASSWORD,
+    markerSecret: process.env.DEMO_IDENTITY_MARKER_SECRET,
   };
 }
 
@@ -152,17 +231,25 @@ async function findAuthUserByEmail(supabase, email) {
   }
 }
 
-async function reconcileAuthUser(supabase, demoUser, password) {
+async function reconcileAuthUser(supabase, demoUser, password, markerSecret) {
   const existingUser = await findAuthUserByEmail(supabase, demoUser.email);
+  const identityMarker = createDemoIdentityMarker(demoUser, markerSecret);
 
   if (existingUser) {
+    if (!isExpectedDemoIdentity(existingUser, demoUser, markerSecret)) {
+      throw new Error(
+        `Refusing unmarked or mismatched Auth email collision for ${demoUser.email}`,
+      );
+    }
+
     const { data, error } = await supabase.auth.admin.updateUserById(
       existingUser.id,
       {
         email_confirm: true,
-        user_metadata: {
-          ...existingUser.user_metadata,
-          display_name: demoUser.displayName,
+        user_metadata: { display_name: demoUser.displayName },
+        app_metadata: {
+          ...existingUser.app_metadata,
+          [DEMO_IDENTITY_METADATA_KEY]: identityMarker,
         },
       },
     );
@@ -175,6 +262,7 @@ async function reconcileAuthUser(supabase, demoUser, password) {
     password,
     email_confirm: true,
     user_metadata: { display_name: demoUser.displayName },
+    app_metadata: { [DEMO_IDENTITY_METADATA_KEY]: identityMarker },
   });
   assertSucceeded(error, `Auth creation for ${demoUser.email}`);
   return { user: data.user, status: "created" };
@@ -240,7 +328,9 @@ async function reconcileMembership(
 }
 
 async function main() {
-  const { supabaseUrl, serviceRoleKey, demoPassword } = requireEnvironment();
+  const { supabaseUrl, serviceRoleKey, demoPassword, markerSecret } =
+    requireEnvironment();
+  validateMarkerSecret(markerSecret);
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,
@@ -301,6 +391,7 @@ async function main() {
       supabase,
       demoUser,
       demoPassword,
+      markerSecret,
     );
 
     const { error: profileError } = await supabase.from("profiles").upsert(
@@ -358,8 +449,12 @@ async function main() {
   console.log(`ready: ${demoUsers.length} Apex Autohaus demo identities`);
 }
 
-main().catch((error) => {
-  const message = error instanceof Error ? error.message : "Unknown bootstrap error";
-  console.error(`Demo user bootstrap failed: ${message}`);
-  process.exitCode = 1;
-});
+const entryPoint = process.argv[1];
+if (entryPoint && import.meta.url === pathToFileURL(entryPoint).href) {
+  main().catch((error) => {
+    const message =
+      error instanceof Error ? error.message : "Unknown bootstrap error";
+    console.error(`Demo user bootstrap failed: ${message}`);
+    process.exitCode = 1;
+  });
+}

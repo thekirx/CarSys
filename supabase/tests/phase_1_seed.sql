@@ -3,10 +3,15 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(20);
+select plan(21);
 
--- A local reset applies seed.sql before this file. These constraints are the
--- conflict targets that make its natural-key upserts structurally repeatable.
+-- This file is psql/pg_prove input, not server-only SQL. \ir resolves relative
+-- to this test file, so the standard repository layout must expose the sibling
+-- supabase/seed.sql to the test runner. After db reset's first seed pass, this
+-- second execution runs every real conflict/upsert path inside this transaction.
+\ir ../seed.sql
+
+-- These are the natural conflict targets used by that second seed execution.
 select col_is_unique(
   'public',
   'organizations',
@@ -211,6 +216,19 @@ select is(
   ),
   15,
   'only 15 suitable workflow vehicles have separate financial records'
+);
+
+select is(
+  (
+    select count(*)::integer
+    from public.vehicle_financials financial
+    join public.organizations organization
+      on organization.id = financial.organization_id
+    where organization.slug = 'apex-autohaus'
+      and financial.receivables > 0
+  ),
+  3,
+  'exactly three demo vehicles have nonzero receivables'
 );
 
 select ok(
