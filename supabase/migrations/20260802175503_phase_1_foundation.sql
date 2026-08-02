@@ -604,9 +604,15 @@ create policy role_permissions_delete_user_managers
 on public.role_permissions for delete to authenticated
 using (private.has_permission(organization_id, 'users.manage'));
 
-create policy organization_memberships_select_active_members
+create policy organization_memberships_select_visible_to_members
 on public.organization_memberships for select to authenticated
-using (status = 'active' and private.is_active_member(organization_id));
+using (
+  private.is_active_member(organization_id)
+  and (
+    status = 'active'
+    or private.has_permission(organization_id, 'users.manage')
+  )
+);
 
 create policy organization_memberships_insert_user_managers
 on public.organization_memberships for insert to authenticated
@@ -806,7 +812,11 @@ using (
 
 create policy notifications_select_recipient
 on public.notifications for select to authenticated
-using ((select auth.uid()) is not null and recipient_id = (select auth.uid()));
+using (
+  (select auth.uid()) is not null
+  and recipient_id = (select auth.uid())
+  and private.is_active_member(organization_id)
+);
 
 create policy notifications_insert_members
 on public.notifications for insert to authenticated
@@ -823,8 +833,16 @@ with check (
 
 create policy notifications_update_recipient
 on public.notifications for update to authenticated
-using ((select auth.uid()) is not null and recipient_id = (select auth.uid()))
-with check ((select auth.uid()) is not null and recipient_id = (select auth.uid()));
+using (
+  (select auth.uid()) is not null
+  and recipient_id = (select auth.uid())
+  and private.is_active_member(organization_id)
+)
+with check (
+  (select auth.uid()) is not null
+  and recipient_id = (select auth.uid())
+  and private.is_active_member(organization_id)
+);
 
 create policy audit_logs_select_readers
 on public.audit_logs for select to authenticated

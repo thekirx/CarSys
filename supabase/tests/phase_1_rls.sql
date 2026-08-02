@@ -3,7 +3,7 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(52);
+select plan(61);
 
 -- Schema and RLS assertions. Removing a table or forgetting to enable RLS
 -- makes the corresponding assertion fail independently.
@@ -94,6 +94,8 @@ values
   ('00000000-0000-0000-0000-000000000103', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'sales-a@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
   ('00000000-0000-0000-0000-000000000104', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'branch-a@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
   ('00000000-0000-0000-0000-000000000105', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'inactive-a@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000106', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'invited-a@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
+  ('00000000-0000-0000-0000-000000000107', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'suspended-a@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now()),
   ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'owner-b@example.test', '', now(), '{"provider":"email","providers":["email"]}', '{}', now(), now());
 
 insert into public.profiles (id, display_name) values
@@ -102,6 +104,8 @@ insert into public.profiles (id, display_name) values
   ('00000000-0000-0000-0000-000000000103', 'Sales Agent A'),
   ('00000000-0000-0000-0000-000000000104', 'Branch User A'),
   ('00000000-0000-0000-0000-000000000105', 'Inactive User A'),
+  ('00000000-0000-0000-0000-000000000106', 'Invited User A'),
+  ('00000000-0000-0000-0000-000000000107', 'Suspended User A'),
   ('00000000-0000-0000-0000-000000000201', 'Owner B');
 
 insert into public.organizations (id, company_name, slug) values
@@ -132,6 +136,8 @@ insert into public.organization_memberships (id, organization_id, user_id, role_
   ('10000000-0000-0000-0000-000000000203', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000103', '10000000-0000-0000-0000-000000000103', 'active', 'organization', now(), null),
   ('10000000-0000-0000-0000-000000000204', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000104', '10000000-0000-0000-0000-000000000102', 'active', 'assigned_branches', now(), null),
   ('10000000-0000-0000-0000-000000000205', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', '10000000-0000-0000-0000-000000000102', 'inactive', 'organization', null, now()),
+  ('10000000-0000-0000-0000-000000000206', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000106', '10000000-0000-0000-0000-000000000102', 'invited', 'organization', null, null),
+  ('10000000-0000-0000-0000-000000000207', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000107', '10000000-0000-0000-0000-000000000102', 'suspended', 'organization', now(), now()),
   ('20000000-0000-0000-0000-000000000201', '20000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000201', '20000000-0000-0000-0000-000000000101', 'active', 'organization', now(), null);
 
 insert into public.branches (id, organization_id, code, name, is_primary) values
@@ -162,6 +168,9 @@ values
 insert into public.audit_logs (id, organization_id, actor_id, action, entity_type, entity_id)
 values ('10000000-0000-0000-0000-000000000501', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000101', 'vehicle.created', 'vehicle', '10000000-0000-0000-0000-000000000401');
 
+insert into public.notifications (id, organization_id, recipient_id, category, title, body)
+values ('10000000-0000-0000-0000-000000000601', '10000000-0000-0000-0000-000000000001', '00000000-0000-0000-0000-000000000105', 'membership', 'Inactive notice', 'This row must not be visible after membership becomes inactive.');
+
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000101","role":"authenticated"}', true);
 select results_eq(
@@ -191,6 +200,14 @@ select is_empty(
   $$select id from public.organizations$$,
   'an inactive membership has no organization access'
 );
+select is_empty(
+  $$select id from public.notifications where id = '10000000-0000-0000-0000-000000000601'$$,
+  'an inactive recipient cannot read an organization notification'
+);
+select is_empty(
+  $$update public.notifications set is_read = true, read_at = now() where id = '10000000-0000-0000-0000-000000000601' returning id$$,
+  'an inactive recipient cannot update an organization notification'
+);
 
 reset role;
 set local role authenticated;
@@ -214,8 +231,22 @@ reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000102","role":"authenticated"}', true);
 select is_empty(
+  $$select id from public.organization_memberships where status <> 'active'$$,
+  'an ordinary active member cannot see non-active organization memberships'
+);
+select is_empty(
   $$update public.vehicles set list_price = 1 where id = '10000000-0000-0000-0000-000000000401' returning id$$,
-  'a Viewer cannot mutate vehicles'
+  'a Viewer cannot update vehicles'
+);
+select throws_ok(
+  $$insert into public.vehicles (organization_id, branch_id, stock_number, model_year, make, model, list_price) values ('10000000-0000-0000-0000-000000000001', '10000000-0000-0000-0000-000000000301', 'VIEWER-INSERT', 2024, 'Denied', 'Insert', 1)$$,
+  '42501',
+  'new row violates row-level security policy for table "vehicles"',
+  'a Viewer cannot insert vehicles'
+);
+select is_empty(
+  $$delete from public.vehicles where id = '10000000-0000-0000-0000-000000000401' returning id$$,
+  'a Viewer cannot delete vehicles'
 );
 select is_empty(
   $$update public.organization_modules set is_enabled = false where organization_id = '10000000-0000-0000-0000-000000000001' returning id$$,
@@ -237,6 +268,26 @@ select is_empty(
 reset role;
 set local role authenticated;
 select set_config('request.jwt.claims', '{"sub":"00000000-0000-0000-0000-000000000101","role":"authenticated"}', true);
+select results_eq(
+  $$select count(*) from public.organization_memberships where status <> 'active'$$,
+  $$values (3::bigint)$$,
+  'a users.manage actor can see invited, suspended, and inactive memberships'
+);
+select results_eq(
+  $$update public.organization_memberships set status = 'active', joined_at = now(), inactivated_at = null where id = '10000000-0000-0000-0000-000000000206' returning status::text$$,
+  $$values ('active'::text)$$,
+  'a users.manage actor can activate an invited membership'
+);
+select results_eq(
+  $$update public.organization_memberships set status = 'active', inactivated_at = null where id = '10000000-0000-0000-0000-000000000207' returning status::text$$,
+  $$values ('active'::text)$$,
+  'a users.manage actor can reactivate a suspended membership'
+);
+select results_eq(
+  $$delete from public.organization_memberships where id = '10000000-0000-0000-0000-000000000205' returning status::text$$,
+  $$values ('inactive'::text)$$,
+  'a users.manage actor can delete an inactive membership'
+);
 select throws_ok(
   $$update public.audit_logs set reason = 'tampered' where id = '10000000-0000-0000-0000-000000000501'$$,
   '42501',

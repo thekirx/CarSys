@@ -449,6 +449,7 @@ export type Database = {
         OrganizationMembershipInsert,
         [
           { foreignKeyName: "organization_memberships_organization_id_fkey"; columns: ["organization_id"]; isOneToOne: false; referencedRelation: "organizations"; referencedColumns: ["id"] },
+          { foreignKeyName: "organization_memberships_user_id_fkey"; columns: ["user_id"]; isOneToOne: false; referencedRelation: "profiles"; referencedColumns: ["id"] },
           { foreignKeyName: "organization_memberships_tenant_role_fkey"; columns: ["organization_id", "role_id"]; isOneToOne: false; referencedRelation: "roles"; referencedColumns: ["organization_id", "id"] },
         ]
       >;
