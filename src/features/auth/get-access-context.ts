@@ -117,10 +117,6 @@ export function mapOrganizationAccessContext(
   };
 }
 
-type RequiredAccessContextOptions = Readonly<{
-  allowMissingMembership?: boolean;
-}>;
-
 const relationKey = (value: unknown): unknown => {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     return undefined;
@@ -129,84 +125,123 @@ const relationKey = (value: unknown): unknown => {
   return "key" in value ? value.key : undefined;
 };
 
-export async function getRequiredAccessContext(
-  options: RequiredAccessContextOptions = {},
-): Promise<OrganizationAccessContext | null> {
-  const [{ createServerSupabaseClient }, requestHeaders] = await Promise.all([
-    import("@/lib/supabase/server"),
-    headers(),
-  ]);
-  const supabase = await createServerSupabaseClient();
-  const currentPath = requestHeaders.get(CURRENT_PATH_HEADER);
-  const { data: claimsData, error: claimsError } =
-    await supabase.auth.getClaims();
+export type AccessContextResolution =
+  | Readonly<{ status: "ready"; context: OrganizationAccessContext }>
+  | Readonly<{ status: "unauthenticated" }>
+  | Readonly<{ status: "missing_membership" }>
+  | Readonly<{ status: "unavailable" }>;
+
+const UNAUTHENTICATED = { status: "unauthenticated" } as const;
+const MISSING_MEMBERSHIP = { status: "missing_membership" } as const;
+const UNAVAILABLE = { status: "unavailable" } as const;
+
+export async function getAccessContextResolution(): Promise<AccessContextResolution> {
+  const supabase = await (async () => {
+    try {
+      const { createServerSupabaseClient } = await import(
+        "@/lib/supabase/server"
+      );
+      return await createServerSupabaseClient();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!supabase) {
+    return UNAVAILABLE;
+  }
+
+  const claimsResult = await (async () => {
+    try {
+      return await supabase.auth.getClaims();
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!claimsResult) {
+    return UNAVAILABLE;
+  }
+
+  const { data: claimsData, error: claimsError } = claimsResult;
   const userId =
     !claimsError && typeof claimsData?.claims.sub === "string"
       ? claimsData.claims.sub
       : null;
 
-  if (!userId) {
-    const params = new URLSearchParams({
-      next: getSafeInternalPath(currentPath),
-    });
-    redirect(`/sign-in?${params.toString()}`);
+  if (!userId || !uuid.safeParse(userId).success) {
+    return UNAUTHENTICATED;
   }
 
-  const { data: membership, error: membershipError } = await supabase
-    .from("organization_memberships")
-    .select(
-      "id, organization_id, user_id, role_id, status, organization_scope",
-    )
-    .eq("user_id", userId)
-    .eq("status", "active")
-    .order("organization_id", { ascending: true })
-    .order("id", { ascending: true })
-    .limit(1)
-    .maybeSingle();
-
-  if (membershipError || !membership) {
-    if (
-      options.allowMissingMembership &&
-      currentPath === "/unauthorized"
-    ) {
+  const membershipResult = await (async () => {
+    try {
+      return await supabase
+        .from("organization_memberships")
+        .select(
+          "id, organization_id, user_id, role_id, status, organization_scope",
+        )
+        .eq("user_id", userId)
+        .eq("status", "active")
+        .order("organization_id", { ascending: true })
+        .order("id", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+    } catch {
       return null;
     }
-    redirect("/unauthorized");
+  })();
+
+  if (!membershipResult || membershipResult.error) {
+    return UNAVAILABLE;
+  }
+
+  const membership = membershipResult.data;
+  if (!membership) {
+    return MISSING_MEMBERSHIP;
+  }
+
+  const relatedResults = await (async () => {
+    try {
+      return await Promise.all([
+        supabase
+          .from("role_permissions")
+          .select(
+            "organization_id, role_id, permission:permissions!inner(key)",
+          )
+          .eq("organization_id", membership.organization_id)
+          .eq("role_id", membership.role_id),
+        supabase
+          .from("organization_modules")
+          .select("organization_id, is_enabled, module:modules!inner(key)")
+          .eq("organization_id", membership.organization_id)
+          .eq("is_enabled", true),
+        supabase
+          .from("membership_branches")
+          .select("organization_id, membership_id, branch_id")
+          .eq("organization_id", membership.organization_id)
+          .eq("membership_id", membership.id),
+      ]);
+    } catch {
+      return null;
+    }
+  })();
+
+  if (!relatedResults) {
+    return UNAVAILABLE;
   }
 
   const [rolePermissionsResult, modulesResult, branchesResult] =
-    await Promise.all([
-      supabase
-        .from("role_permissions")
-        .select(
-          "organization_id, role_id, permission:permissions!inner(key)",
-        )
-        .eq("organization_id", membership.organization_id)
-        .eq("role_id", membership.role_id),
-      supabase
-        .from("organization_modules")
-        .select("organization_id, is_enabled, module:modules!inner(key)")
-        .eq("organization_id", membership.organization_id)
-        .eq("is_enabled", true),
-      supabase
-        .from("membership_branches")
-        .select("organization_id, membership_id, branch_id")
-        .eq("organization_id", membership.organization_id)
-        .eq("membership_id", membership.id),
-    ]);
+    relatedResults;
 
   if (
     rolePermissionsResult.error ||
     modulesResult.error ||
-    branchesResult.error
+    branchesResult.error ||
+    !Array.isArray(rolePermissionsResult.data) ||
+    !Array.isArray(modulesResult.data) ||
+    !Array.isArray(branchesResult.data)
   ) {
-    if (
-      options.allowMissingMembership &&
-      currentPath === "/unauthorized"
-    ) {
-      return null;
-    }
-    redirect("/unauthorized");
+    return UNAVAILABLE;
   }
 
   const context = mapOrganizationAccessContext({
@@ -226,14 +261,30 @@ export async function getRequiredAccessContext(
   });
 
   if (!context) {
-    if (
-      options.allowMissingMembership &&
-      currentPath === "/unauthorized"
-    ) {
-      return null;
-    }
+    return UNAVAILABLE;
+  }
+
+  return { status: "ready", context };
+}
+
+export async function getRequiredAccessContext(): Promise<OrganizationAccessContext> {
+  const resolution = await getAccessContextResolution();
+
+  if (resolution.status === "ready") {
+    return resolution.context;
+  }
+
+  if (resolution.status === "missing_membership") {
     redirect("/unauthorized");
   }
 
-  return context;
+  if (resolution.status === "unavailable") {
+    redirect("/access-unavailable");
+  }
+
+  const currentPath = (await headers()).get(CURRENT_PATH_HEADER);
+  const params = new URLSearchParams({
+    next: getSafeInternalPath(currentPath),
+  });
+  redirect(`/sign-in?${params.toString()}`);
 }

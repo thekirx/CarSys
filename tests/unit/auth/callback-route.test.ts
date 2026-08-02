@@ -14,12 +14,41 @@ vi.mock("@/lib/supabase/server", () => ({
 }));
 
 describe("authentication callback", () => {
+  let responseMutations:
+    | {
+        cookies: Array<{
+          name: string;
+          value: string;
+          options: { httpOnly: boolean; path: string; sameSite: "lax" };
+        }>;
+        headers: Headers;
+      }
+    | undefined;
+
   beforeEach(() => {
     vi.clearAllMocks();
-    createServerSupabaseClientMock.mockResolvedValue({
-      auth: { exchangeCodeForSession: exchangeCodeForSessionMock },
+    responseMutations = undefined;
+    createServerSupabaseClientMock.mockImplementation((options) => {
+      responseMutations = options?.responseMutations;
+      return {
+        auth: { exchangeCodeForSession: exchangeCodeForSessionMock },
+      };
     });
-    exchangeCodeForSessionMock.mockResolvedValue({ error: null });
+    exchangeCodeForSessionMock.mockImplementation(async () => {
+      responseMutations?.cookies.push({
+        name: "sb-auth",
+        value: "new-session",
+        options: { httpOnly: true, path: "/", sameSite: "lax" },
+      });
+      responseMutations?.headers.set(
+        "Cache-Control",
+        "private, no-cache, no-store, must-revalidate, max-age=0",
+      );
+      responseMutations?.headers.set("Expires", "0");
+      responseMutations?.headers.set("Pragma", "no-cache");
+
+      return { error: null };
+    });
   });
 
   it("falls back to the dashboard after a successful exchange with an external return path", async () => {
@@ -33,6 +62,14 @@ describe("authentication callback", () => {
     expect(response.headers.get("location")).toBe(
       "https://carsys.example/dashboard",
     );
+    expect(response.headers.get("set-cookie")).toContain(
+      "sb-auth=new-session",
+    );
+    expect(response.headers.get("cache-control")).toBe(
+      "private, no-cache, no-store, must-revalidate, max-age=0",
+    );
+    expect(response.headers.get("expires")).toBe("0");
+    expect(response.headers.get("pragma")).toBe("no-cache");
   });
 
   it("honors an allowlisted return path after a successful exchange", async () => {

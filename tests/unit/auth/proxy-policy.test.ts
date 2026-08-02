@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { unstable_doesMiddlewareMatch } from "next/experimental/testing/server";
+import { unstable_doesMiddlewareMatch as unstable_doesProxyMatch } from "next/experimental/testing/server";
 import { NextResponse } from "next/server";
 
 import {
@@ -17,6 +17,7 @@ describe("protected application path classification", () => {
     "/audit-logs",
     "/settings/company",
     "/unauthorized",
+    "/access-unavailable",
   ])("classifies %s as protected", (pathname) => {
     expect(isProtectedApplicationPath(pathname)).toBe(true);
   });
@@ -40,7 +41,16 @@ describe("Proxy matcher", () => {
     "/auth/callback",
     "/settings/company",
   ])("runs for application route %s", (url) => {
-    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(true);
+    expect(unstable_doesProxyMatch({ config, url })).toBe(true);
+  });
+
+  it.each([
+    "/settings/export.js",
+    "/dashboard/theme.css",
+    "/vehicles/photos/primary.png",
+    "/access-unavailable/status.css",
+  ])("still runs for protected extension-looking route %s", (url) => {
+    expect(unstable_doesProxyMatch({ config, url })).toBe(true);
   });
 
   it.each([
@@ -50,7 +60,7 @@ describe("Proxy matcher", () => {
     "/fonts/geist.woff2",
     "/favicon.ico",
   ])("skips ordinary static asset %s", (url) => {
-    expect(unstable_doesMiddlewareMatch({ config, url })).toBe(false);
+    expect(unstable_doesProxyMatch({ config, url })).toBe(false);
   });
 });
 

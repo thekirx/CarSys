@@ -9,6 +9,7 @@ const PROTECTED_APPLICATION_PREFIXES = [
   "/audit-logs",
   "/settings",
   "/unauthorized",
+  "/access-unavailable",
 ] as const;
 
 const shouldSkipCopiedHeader = (name: string) =>

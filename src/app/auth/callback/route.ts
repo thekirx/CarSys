@@ -1,6 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 import { getSafeInternalPath } from "@/features/auth/safe-redirect";
+import {
+  applySupabaseResponseMutations,
+  createSupabaseResponseMutations,
+} from "@/lib/supabase/response-mutations";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 const callbackFailureResponse = (request: NextRequest) => {
@@ -15,18 +19,24 @@ export async function GET(request: NextRequest) {
     return callbackFailureResponse(request);
   }
 
-  const supabase = await createServerSupabaseClient();
+  const responseMutations = createSupabaseResponseMutations();
+  const supabase = await createServerSupabaseClient({ responseMutations });
+  const finalizeResponse = (response: NextResponse) =>
+    applySupabaseResponseMutations(response, responseMutations);
+
   try {
     const { error } = await supabase.auth.exchangeCodeForSession(code);
     if (error) {
-      return callbackFailureResponse(request);
+      return finalizeResponse(callbackFailureResponse(request));
     }
   } catch {
-    return callbackFailureResponse(request);
+    return finalizeResponse(callbackFailureResponse(request));
   }
 
   const nextPath = getSafeInternalPath(
     request.nextUrl.searchParams.get("next"),
   );
-  return NextResponse.redirect(new URL(nextPath, request.url));
+  return finalizeResponse(
+    NextResponse.redirect(new URL(nextPath, request.url)),
+  );
 }

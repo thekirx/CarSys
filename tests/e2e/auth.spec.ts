@@ -13,6 +13,31 @@ test("redirects an unauthenticated dashboard visitor to sign-in with a safe retu
   ).toBeVisible();
 });
 
+test("does not let a spoofed path header bypass an extension-looking protected route", async ({
+  page,
+}) => {
+  const browserErrors: string[] = [];
+  page.on("console", (message) => {
+    if (message.type() === "error") {
+      browserErrors.push(message.text());
+    }
+  });
+  page.on("pageerror", (error) => browserErrors.push(error.message));
+  await page.setExtraHTTPHeaders({
+    "x-carsys-current-path": "/unauthorized",
+  });
+
+  await page.goto("/settings/export.js");
+
+  await expect(page).toHaveURL(
+    /\/sign-in\?next=%2Fsettings%2Fexport\.js$/,
+  );
+  await expect(
+    page.getByRole("heading", { name: "Welcome to Apex Autohaus" }),
+  ).toBeVisible();
+  expect(browserErrors).toEqual([]);
+});
+
 test("renders an accessible sign-in form and reports malformed input generically", async ({
   page,
 }, testInfo) => {
