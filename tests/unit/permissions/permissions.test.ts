@@ -46,6 +46,16 @@ describe("permission resolution", () => {
     expect(canAccessBranch(assignedContext, "")).toBe(false);
   });
 
+  it("denies a malformed runtime scope even when the branch is assigned", () => {
+    const malformedScopeContext = {
+      ...organizationContext,
+      scope: "branch",
+      branchIds: ["branch-1"],
+    } as unknown as OrganizationAccessContext;
+
+    expect(canAccessBranch(malformedScopeContext, "branch-1")).toBe(false);
+  });
+
   it("fails closed for malformed context IDs", () => {
     const malformedContext: OrganizationAccessContext = {
       ...organizationContext,

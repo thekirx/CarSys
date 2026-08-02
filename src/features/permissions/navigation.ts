@@ -13,9 +13,8 @@ export type NavigationItem = Readonly<{
   requiredPermission: PermissionKey;
 }>;
 
-// This registry is route metadata for the upcoming application shell. Fleet and
-// Rental entries remain invisible until their future modules are enabled; this
-// policy layer does not create or imply that their routes are implemented.
+// This registry is route metadata for the Phase 1 dealership shell. Future
+// Fleet and Rental modules remain module-settings upgrades, not navigation.
 const navigationRegistry = [
   {
     key: "dashboard",
@@ -37,20 +36,6 @@ const navigationRegistry = [
     href: "/reports",
     requiredModule: "dealership",
     requiredPermission: "reports.read",
-  },
-  {
-    key: "fleet-management",
-    label: "Fleet Management",
-    href: "/fleet-management",
-    requiredModule: "fleet_management",
-    requiredPermission: "vehicles.read",
-  },
-  {
-    key: "vehicle-rental",
-    label: "Vehicle Rental",
-    href: "/vehicle-rental",
-    requiredModule: "vehicle_rental",
-    requiredPermission: "vehicles.read",
   },
   {
     key: "company-settings",

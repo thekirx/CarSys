@@ -31,8 +31,12 @@ export const canAccessBranch = (
     return true;
   }
 
-  return context.branchIds.some(
-    (assignedBranchId) =>
-      isNonEmptyIdentifier(assignedBranchId) && assignedBranchId === branchId,
-  );
+  if (context.scope === "assigned_branches") {
+    return context.branchIds.some(
+      (assignedBranchId) =>
+        isNonEmptyIdentifier(assignedBranchId) && assignedBranchId === branchId,
+    );
+  }
+
+  return false;
 };
