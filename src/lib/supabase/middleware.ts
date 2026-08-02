@@ -6,8 +6,9 @@ import type { Database } from "@/lib/supabase/types";
 
 export async function updateSession(
   request: NextRequest,
-): Promise<NextResponse> {
-  let response = NextResponse.next({ request });
+  requestHeaders = new Headers(request.headers),
+): Promise<Readonly<{ response: NextResponse; userId: string | null }>> {
+  let response = NextResponse.next({ request: { headers: requestHeaders } });
   const {
     NEXT_PUBLIC_SUPABASE_URL,
     NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
@@ -26,7 +27,12 @@ export async function updateSession(
             request.cookies.set(name, value);
           });
 
-          response = NextResponse.next({ request });
+          const cookieHeader = request.headers.get("cookie");
+          if (cookieHeader) {
+            requestHeaders.set("cookie", cookieHeader);
+          }
+
+          response = NextResponse.next({ request: { headers: requestHeaders } });
 
           cookiesToSet.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options);
@@ -39,7 +45,9 @@ export async function updateSession(
     },
   );
 
-  await supabase.auth.getClaims();
+  const { data, error } = await supabase.auth.getClaims();
+  const userId =
+    !error && typeof data?.claims.sub === "string" ? data.claims.sub : null;
 
-  return response;
+  return { response, userId };
 }
