@@ -81,6 +81,9 @@ payload binds the Apex organization, stable demo identity key, normalized
 email, and exact role code. A repeat run reconciles an existing email only when
 all marker fields and the constant-time signature check match that expected
 identity. It never treats user-editable `user_metadata` as proof of ownership.
+For a valid marked identity, reconciliation preserves existing
+`user_metadata` fields and replaces only `display_name`; the signed identity
+proof remains exclusively in service-controlled `app_metadata`.
 
 An unmarked email or a marker for another demo email, identity key, or role is
 a hard collision: the script stops before confirming the account or writing a
@@ -104,10 +107,19 @@ imported by application code under `src/`.
 
 ## Seed idempotency test invocation
 
-`supabase/tests/phase_1_seed.sql` is psql/pg_prove input. It uses the psql
-`\ir ../seed.sql` meta-command to execute the real seed a second time inside
-the test transaction. Run it from the checked-out standard repository layout,
-for example with `supabase test db supabase/tests/phase_1_seed.sql` after a
-local reset, or with `psql -f supabase/tests/phase_1_seed.sql`. The test runner
-must expose `supabase/seed.sql` at that relative sibling path; copying the test
-file alone into a SQL editor does not satisfy the invocation contract.
+`supabase/seed.sql` defines the one canonical SQL seed body as
+`private.seed_phase_1_demo()`, locks that helper down, and invokes it once. The
+function is explicitly owned by `postgres`, uses `security invoker` with an
+empty fixed `search_path`, fully qualifies its relations, and has all function
+privileges revoked from `PUBLIC`, `anon`, `authenticated`, and `service_role`.
+It is an operational reset/test helper, not an application RPC; only its owner
+can execute it and its statements still run with the caller's privileges.
+
+`supabase/tests/phase_1_seed.sql` is pgTAP input for
+`supabase test db supabase/tests/phase_1_seed.sql`. The Supabase CLI mounts only
+the tests directory into its pg_prove container, so the test does not include a
+sibling file. Instead, it verifies the helper's ownership, invoker mode, fixed
+search path, and ACL before calling that exact canonical function through
+`lives_ok`. Because `db reset` applies the seed first, this transaction-scoped
+call exercises every real conflict/upsert path on a second pass without a
+drift-prone copy of the seed SQL.

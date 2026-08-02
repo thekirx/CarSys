@@ -3,13 +3,98 @@ begin;
 create extension if not exists pgtap with schema extensions;
 set local search_path = public, extensions;
 
-select plan(21);
+select plan(27);
 
--- This file is psql/pg_prove input, not server-only SQL. \ir resolves relative
--- to this test file, so the standard repository layout must expose the sibling
--- supabase/seed.sql to the test runner. After db reset's first seed pass, this
--- second execution runs every real conflict/upsert path inside this transaction.
-\ir ../seed.sql
+-- db reset installs the exact seed body as a locked-down private helper. Calling
+-- it here works with the CLI's tests-only container mount and exercises every
+-- real conflict/upsert path on the second pass without duplicating seed SQL.
+select is(
+  (
+    select count(*)::integer
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'private'
+      and proc.proname = 'seed_phase_1_demo'
+      and proc.prokind = 'f'
+      and proc.pronargs = 0
+  ),
+  1,
+  'the canonical private Phase 1 seed function exists exactly once'
+);
+
+select ok(
+  (
+    select not proc.prosecdef
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'private'
+      and proc.proname = 'seed_phase_1_demo'
+      and proc.pronargs = 0
+  ),
+  'the seed function executes with caller privileges'
+);
+
+select is(
+  (
+    select pg_catalog.pg_get_userbyid(proc.proowner)
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace
+      on namespace.oid = proc.pronamespace
+    where namespace.nspname = 'private'
+      and proc.proname = 'seed_phase_1_demo'
+      and proc.pronargs = 0
+  ),
+  'postgres'::name,
+  'the seed function has the explicit postgres owner expected by reset and tests'
+);
+
+select ok(
+  (
+    select coalesce(
+      bool_or(
+        pg_catalog.regexp_replace(setting, '^search_path=', '') in ('', '""')
+      ),
+      false
+    )
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace
+      on namespace.oid = proc.pronamespace
+    cross join lateral unnest(proc.proconfig) setting
+    where namespace.nspname = 'private'
+      and proc.proname = 'seed_phase_1_demo'
+      and proc.pronargs = 0
+      and setting like 'search_path=%'
+  ),
+  'the seed function has an empty fixed search_path'
+);
+
+select ok(
+  not exists (
+    select 1
+    from pg_catalog.pg_proc proc
+    join pg_catalog.pg_namespace namespace
+      on namespace.oid = proc.pronamespace
+    cross join lateral pg_catalog.aclexplode(
+      coalesce(
+        proc.proacl,
+        pg_catalog.acldefault('f', proc.proowner)
+      )
+    ) acl
+    where namespace.nspname = 'private'
+      and proc.proname = 'seed_phase_1_demo'
+      and proc.pronargs = 0
+      and acl.privilege_type = 'EXECUTE'
+      and acl.grantee <> proc.proowner
+  ),
+  'no role other than the postgres owner can execute the seed function'
+);
+
+select lives_ok(
+  $$select private.seed_phase_1_demo()$$,
+  'the exact canonical seed body survives a second execution'
+);
 
 -- These are the natural conflict targets used by that second seed execution.
 select col_is_unique(

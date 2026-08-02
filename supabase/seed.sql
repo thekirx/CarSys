@@ -1,6 +1,22 @@
 -- Deterministic Phase 1 demo tenancy. Auth-backed rows are installed by
 -- scripts/create-demo-users.mjs after the corresponding Auth identities exist.
 
+begin;
+
+-- This deliberately persistent helper is the single canonical seed body used
+-- by both db reset and pgTAP idempotency verification. It is not an application
+-- RPC: only its postgres owner may execute it, and it uses caller privileges.
+drop function if exists private.seed_phase_1_demo();
+
+create function private.seed_phase_1_demo()
+returns void
+language plpgsql
+volatile
+security invoker
+set search_path = ''
+as $seed$
+begin
+
 insert into public.organizations (
   id,
   company_name,
@@ -448,3 +464,15 @@ set organization_id = excluded.organization_id,
 -- reconciles those identities first, then installs profiles, memberships,
 -- branch assignments, notifications, and audit events with these SQL rows in
 -- place. No Auth password or privileged credential belongs in this file.
+end;
+$seed$;
+
+alter function private.seed_phase_1_demo() owner to postgres;
+revoke all on function private.seed_phase_1_demo() from public;
+revoke all on function private.seed_phase_1_demo() from anon;
+revoke all on function private.seed_phase_1_demo() from authenticated;
+revoke all on function private.seed_phase_1_demo() from service_role;
+
+select private.seed_phase_1_demo();
+
+commit;

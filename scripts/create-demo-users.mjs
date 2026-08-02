@@ -185,6 +185,13 @@ export function isExpectedDemoIdentity(authUser, demoUser, markerSecret) {
   );
 }
 
+export function mergeDemoUserMetadata(existingMetadata, displayName) {
+  return {
+    ...(existingMetadata ?? {}),
+    display_name: displayName,
+  };
+}
+
 function requireEnvironment() {
   const missing = REQUIRED_ENVIRONMENT.filter((name) => !process.env[name]);
 
@@ -246,7 +253,10 @@ async function reconcileAuthUser(supabase, demoUser, password, markerSecret) {
       existingUser.id,
       {
         email_confirm: true,
-        user_metadata: { display_name: demoUser.displayName },
+        user_metadata: mergeDemoUserMetadata(
+          existingUser.user_metadata,
+          demoUser.displayName,
+        ),
         app_metadata: {
           ...existingUser.app_metadata,
           [DEMO_IDENTITY_METADATA_KEY]: identityMarker,
