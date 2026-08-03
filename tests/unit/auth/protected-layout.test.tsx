@@ -12,6 +12,12 @@ vi.mock("@/features/auth/get-access-context", () => ({
   CURRENT_PATH_HEADER: "x-carsys-current-path",
   getRequiredAccessContext: getRequiredAccessContextMock,
 }));
+vi.mock("@/lib/supabase/server", () => ({
+  createServerSupabaseClient: vi.fn(),
+}));
+vi.mock("@/components/app-shell/get-shell-data", () => ({
+  loadApplicationShellData: vi.fn(),
+}));
 
 describe("protected application layout", () => {
   beforeEach(() => {
