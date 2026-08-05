@@ -15,6 +15,22 @@ CarSys is a secure vehicle-operations command center for Philippine dealerships.
 - Vitest unit tests and Playwright role-access smoke tests
 - Built-in demo mode that works before Supabase is connected
 
+
+## Continue from this handoff ZIP
+
+The archive includes a Git repository on branch `feat/phase-1-foundation`, with `origin` pointing to `https://github.com/thekirx/CarSys.git`. After extracting it:
+
+```bash
+cd CarSys-complete
+git status
+corepack enable
+pnpm install
+pnpm verify
+git push -u origin feat/phase-1-foundation
+```
+
+Then open a pull request from `feat/phase-1-foundation` into `main`. Do not add `.env.local` or a service-role key to Git.
+
 ## Stack
 
 - Next.js 16 App Router and React 19
