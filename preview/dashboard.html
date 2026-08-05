@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>CarSys Dashboard Preview</title>
+<link rel="stylesheet" href="../src/app/globals.css">
+<style>
+  body{font-size:14px}.preview-icon{font-size:15px;line-height:1}.app-frame{padding-left:252px}.app-sidebar{display:flex}.app-header{position:fixed;left:252px;right:0}.app-main{padding-top:78px}.page-content{max-width:none}.sidebar-link span{display:inline}.chart-column>span{display:block}.priority-alert a{color:#4f5761}.dashboard-page{max-width:1500px}.preview-logo{font-weight:900;font-size:18px}.no-motion *{animation:none!important}
+@media(max-width:820px){.app-frame{padding-left:0}.app-sidebar{display:none}.app-header{position:sticky;left:auto;right:auto}.app-main{padding-top:0}}
+</style>
+</head>
+<body class="no-motion">
+<div class="app-frame">
+<aside class="app-sidebar">
+  <div class="sidebar-brand"><span class="brand-mark preview-icon">⌁</span><span><strong>CarSys</strong><small>Apex Autohaus</small></span></div>
+  <nav class="sidebar-nav">
+    <p class="nav-section-label">Workspace</p>
+    <a class="sidebar-link sidebar-link-active" href="#"><b class="preview-icon">▦</b><span>Dashboard</span><i></i></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">◇</b><span>Vehicle Inventory</span></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">◎</b><span>Customers</span></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">□</b><span>Test Drives</span></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">₱</b><span>Sales &amp; Deals</span></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">⌁</b><span>Reports</span></a>
+    <a class="sidebar-link" href="#"><b class="preview-icon">⚙</b><span>Settings</span></a>
+  </nav>
+  <div class="sidebar-footer"><div class="system-status"><span class="status-dot"></span><span><strong>All systems operational</strong><small>Last checked just now</small></span></div><button class="sidebar-collapse">‹‹ <span>Collapse sidebar</span></button></div>
+</aside>
+<div class="app-main">
+<header class="app-header">
+  <div class="header-left"><div><p class="breadcrumb">Apex Autohaus <span>/</span> Dashboard</p><h1>Dashboard</h1></div></div>
+  <div class="header-actions"><label class="header-search"><span>⌕</span><input placeholder="Search stock, customer, deal…"></label><button class="icon-button notification-button">♢<span>3</span></button><button class="branch-chip">▣ <span>Quezon City Main</span></button><button class="user-menu-trigger"><span class="avatar">KO</span><span class="user-menu-copy"><strong>Kirk Orino</strong><small>Owner</small></span>⌄</button></div>
+</header>
+<main class="page-content"><div class="dashboard-page">
+<div class="demo-banner"><div><span>◆</span><span><strong>Demo workspace</strong> Explore how access changes by role.</span></div><div><a class="active">Owner</a><a>Manager</a><a>Sales</a><a>Inventory</a><a>Viewer</a></div></div>
+<section class="dashboard-welcome"><div><p class="eyebrow">Wednesday, August 5</p><h2>Good evening, Kirk.</h2><p>Here is what needs attention across Quezon City Main today.</p></div><div class="period-control"><button class="active">This month</button><button>Last month</button><button>Quarter</button></div></section>
+<section class="metric-grid">
+<article class="metric-card"><div class="metric-card-top"><span class="metric-icon">◇</span><span class="metric-trend">+3 this month</span></div><p>Total inventory</p><strong>25</strong><small>Across all workflow stages</small></article>
+<article class="metric-card"><div class="metric-card-top"><span class="metric-icon metric-positive">◉</span><span class="metric-trend metric-positive">56% of inventory</span></div><p>Available</p><strong>14</strong><small>Ready for customer inquiries</small></article>
+<article class="metric-card"><div class="metric-card-top"><span class="metric-icon metric-warning">◷</span><span class="metric-trend metric-warning">2 expire today</span></div><p>Reserved</p><strong>4</strong><small>Pending deal completion</small></article>
+<article class="metric-card"><div class="metric-card-top"><span class="metric-icon metric-positive">↗</span><span class="metric-trend metric-positive">+16.7% vs Jul</span></div><p>Sold this month</p><strong>7</strong><small>₱12.1M booked revenue</small></article>
+</section>
+<section class="dashboard-band"><div class="band-copy"><span class="band-icon">₱</span><div><p>Inventory capital overview</p><h3>₱21,800,000</h3><small>Currently invested in active inventory</small></div></div><div class="band-metrics"><div><span>Projected revenue</span><strong>₱26,750,000</strong></div><div><span>Projected gross profit</span><strong>₱4,950,000</strong></div><div><span>Expected margin</span><strong>18.5%</strong></div></div></section>
+<div class="dashboard-primary-grid">
+<section class="card sales-card"><div class="card-header"><div><p class="card-kicker">Performance</p><h3>Sales momentum</h3><span>Units sold and booked revenue over six months</span></div><a>View report ↗</a></div><div class="sales-chart"><div class="chart-y-axis"><span>₱16M</span><span>₱12M</span><span>₱8M</span><span>₱4M</span><span>₱0</span></div><div class="chart-plot"><div class="chart-gridlines"><i></i><i></i><i></i><i></i><i></i></div><div class="chart-bars">
+<div class="chart-column"><span style="height:52%"></span><small>Mar</small></div><div class="chart-column"><span style="height:73%"></span><small>Apr</small></div><div class="chart-column"><span style="height:62%"></span><small>May</small></div><div class="chart-column"><span style="height:100%"></span><small>Jun</small></div><div class="chart-column"><span style="height:89%"></span><small>Jul</small></div><div class="chart-column"><span style="height:77%"></span><small>Aug</small></div>
+</div></div></div><div class="sales-summary"><div><span class="legend-dot amber"></span>Booked revenue<strong>₱71.1M</strong></div><div><span class="legend-dot dark"></span>Units sold<strong>42</strong></div><p>↗ August pace is 9% ahead of average.</p></div></section>
+<section class="card priority-card"><div class="card-header"><div><p class="card-kicker">Requires action</p><h3>Priority alerts</h3><span>Ordered by operational impact</span></div><span class="count-badge">3</span></div><div class="alert-list"><article class="priority-alert priority-critical"><span class="alert-icon">!</span><div><h4>3 vehicles need pricing review</h4><p>Inventory aged over 45 days</p><a>Review inventory ↗</a></div></article><article class="priority-alert priority-warning"><span class="alert-icon">!</span><div><h4>2 reservations expire today</h4><p>Follow up before 5:00 PM</p><a>Open reservations ↗</a></div></article><article class="priority-alert priority-info"><span class="alert-icon">i</span><div><h4>4 preparation tasks are overdue</h4><p>Assigned to QC Main inventory team</p><a>View tasks ↗</a></div></article></div></section>
+</div>
+<div class="dashboard-secondary-grid">
+<section class="card pipeline-card"><div class="card-header"><div><p class="card-kicker">Operations</p><h3>Inventory pipeline</h3><span>Current vehicles by workflow stage</span></div><a>Open inventory ↗</a></div><div class="pipeline-list"><div class="pipeline-item"><div class="pipeline-label"><span>Acquired</span><strong>3</strong></div><div class="pipeline-track"><span style="width:12%"></span></div><small>12%</small><i></i></div><div class="pipeline-item"><div class="pipeline-label"><span>Inspection</span><strong>4</strong></div><div class="pipeline-track"><span style="width:16%"></span></div><small>16%</small><i></i></div><div class="pipeline-item"><div class="pipeline-label"><span>Preparation</span><strong>2</strong></div><div class="pipeline-track"><span style="width:8%"></span></div><small>8%</small><i></i></div><div class="pipeline-item"><div class="pipeline-label"><span>Ready</span><strong>2</strong></div><div class="pipeline-track"><span style="width:8%"></span></div><small>8%</small><i></i></div><div class="pipeline-item"><div class="pipeline-label"><span>Available</span><strong>14</strong></div><div class="pipeline-track"><span style="width:56%"></span></div><small>56%</small><i></i></div><div class="pipeline-item"><div class="pipeline-label"><span>Reserved</span><strong>4</strong></div><div class="pipeline-track"><span style="width:16%"></span></div><small>16%</small></div></div></section>
+<section class="card test-drive-card"><div class="card-header"><div><p class="card-kicker">Today</p><h3>Upcoming test drives</h3><span>3 appointments at QC Main</span></div><b>□</b></div><div class="appointment-list"><article><time>10:30 AM</time><div><h4>Miguel Navarro</h4><p>2024 Toyota Fortuner</p><small>◎ Paolo Reyes</small></div></article><article><time>1:00 PM</time><div><h4>Sofia Tan</h4><p>2023 Ford Everest</p><small>◎ Bianca Santos</small></div></article><article><time>3:30 PM</time><div><h4>Anton Garcia</h4><p>2021 Lexus RX 350</p><small>◎ Paolo Reyes</small></div></article></div></section>
+<section class="card aging-card"><div class="card-header"><div><p class="card-kicker">Inventory aging</p><h3>Oldest unsold</h3><span>Vehicles that may need intervention</span></div><b>◷</b></div><div class="aging-list"><article><span class="vehicle-monogram">L</span><div><h4>2021 Lexus RX 350 F Sport</h4><p>AA-2606 · ₱3,290,000</p></div><strong>63<small>days</small></strong></article><article><span class="vehicle-monogram">V</span><div><h4>2021 Volvo XC60 D4</h4><p>AA-2618 · ₱2,680,000</p></div><strong>58<small>days</small></strong></article><article><span class="vehicle-monogram">B</span><div><h4>2021 BMW X3 xDrive20d</h4><p>AA-2612 · ₱2,850,000</p></div><strong>52<small>days</small></strong></article></div></section>
+</div>
+</div></main>
+</div></div>
+</body></html>

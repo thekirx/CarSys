@@ -1,0 +1,2 @@
+import { FeaturePreview } from "@/components/feature-preview";
+export default function CustomersPage() { return <FeaturePreview title="Customer intelligence" phase="Phase 3" description="Centralize customer profiles, vehicle preferences, inquiry history, and deterministic inventory matching." capabilities={["Customer profiles", "Inquiry timeline", "Preference matching", "Follow-up ownership"]} />; }
