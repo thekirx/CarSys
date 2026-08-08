@@ -28,3 +28,4 @@ supabase/.temp/
 
 # generated QA artifacts
 artifacts/
+tsconfig.tsbuildinfo
