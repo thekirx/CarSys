@@ -156,7 +156,7 @@ create table public.vehicles (
 -- Sensitive acquisition and profitability values are intentionally separated from
 -- the general vehicle record so non-financial roles cannot receive them in payloads.
 create table public.vehicle_financials (
-  vehicle_id uuid primary key references public.vehicles(id) on delete cascade,
+  vehicle_id uuid primary key,
   organization_id uuid not null references public.organizations(id) on delete cascade,
   acquisition_value numeric(14,2) not null default 0 check (acquisition_value >= 0),
   preparation_cost numeric(14,2) not null default 0 check (preparation_cost >= 0),
